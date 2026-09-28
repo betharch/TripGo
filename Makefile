@@ -30,6 +30,7 @@ migrate: check-db-url
 migrate-down: check-db-url
 	go tool goose -dir $(MIGRATIONS_DIR) postgres "$$DATABASE_URL" down
 
+migrate-reset: check-db-url
 	go tool goose -dir $(MIGRATIONS_DIR) postgres "$$DATABASE_URL" reset
 
 migrate-status: check-db-url
