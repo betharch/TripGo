@@ -1,0 +1,9 @@
+schema_version = 1
+lab = 1
+components = ["postgres"]
+
+[env]
+HTTP_READ_HEADER_TIMEOUT = "2s"
+HTTP_READ_TIMEOUT = "5s"
+HTTP_WRITE_TIMEOUT = "20s"
+HTTP_IDLE_TIMEOUT = "60s"
