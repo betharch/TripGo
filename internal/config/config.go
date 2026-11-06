@@ -9,11 +9,14 @@ import (
 	"time"
 )
 
+const otlpProtocol = "http/protobuf"
+
 type Config struct {
 	HTTP            HTTP
 	DB              DB
 	LogLevel        slog.Level
 	ShutdownTimeout time.Duration
+	ServiceName     string
 }
 
 type HTTP struct {
@@ -53,9 +56,16 @@ func Load() (Config, error) {
 		},
 		LogLevel:        p.level("LOG_LEVEL"),
 		ShutdownTimeout: p.duration("SHUTDOWN_TIMEOUT"),
+		ServiceName:     p.required("OTEL_SERVICE_NAME"),
 	}
 	if cfg.DB.MaxConns > 0 && cfg.DB.MinConns > cfg.DB.MaxConns {
 		p.fail("DATABASE_MIN_CONNS", fmt.Errorf("must not exceed DATABASE_MAX_CONNS (%d)", cfg.DB.MaxConns))
+	}
+	p.required("OTEL_EXPORTER_OTLP_ENDPOINT")
+	p.required("OTEL_RESOURCE_ATTRIBUTES")
+	p.required("OTEL_TRACES_SAMPLER")
+	if protocol := p.required("OTEL_EXPORTER_OTLP_PROTOCOL"); protocol != "" && protocol != otlpProtocol {
+		p.fail("OTEL_EXPORTER_OTLP_PROTOCOL", fmt.Errorf("must be %s, got %s", otlpProtocol, protocol))
 	}
 
 	if err := errors.Join(p.errs...); err != nil {
