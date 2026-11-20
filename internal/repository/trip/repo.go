@@ -13,6 +13,9 @@ import (
 const (
 	codeUniqueViolation   = "23505"
 	driverActiveTripIndex = "trips_driver_active_uniq"
+
+	activeOnly = "status = 'active'"
+	lastSeenAt = "COALESCE(last_position_at, started_at)"
 )
 
 var psql = sq.StatementBuilder.PlaceholderFormat(sq.Dollar)

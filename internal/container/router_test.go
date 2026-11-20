@@ -13,18 +13,22 @@ import (
 
 	api "github.com/betharch/TripGo/internal/generated"
 	"github.com/betharch/TripGo/internal/http/health"
+	addpositionhttp "github.com/betharch/TripGo/internal/http/trip/addposition"
 	createhttp "github.com/betharch/TripGo/internal/http/trip/create"
 	finishhttp "github.com/betharch/TripGo/internal/http/trip/finish"
 	gethttp "github.com/betharch/TripGo/internal/http/trip/get"
+	listpositionshttp "github.com/betharch/TripGo/internal/http/trip/listpositions"
 )
 
 func do(method, path string) *httptest.ResponseRecorder {
 	log := slog.New(slog.DiscardHandler)
 	mux := newRouter(server{
-		create: createhttp.New(nil, log),
-		get:    gethttp.New(nil, log),
-		finish: finishhttp.New(nil, log),
-		health: health.New(nil, time.Second, log),
+		create:        createhttp.New(nil, log),
+		get:           gethttp.New(nil, log),
+		finish:        finishhttp.New(nil, log),
+		addPosition:   addpositionhttp.New(nil, log),
+		listPositions: listpositionshttp.New(nil, log),
+		health:        health.New(nil, time.Second, log),
 	})
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, httptest.NewRequest(method, path, http.NoBody))
@@ -54,6 +58,14 @@ func TestWrongMethodIs405WithAllow(t *testing.T) {
 	assert.Equal(t, "method_not_allowed", problem(t, rec).Code)
 }
 
+func TestPositionsRouteAllowsGetAndPost(t *testing.T) {
+	rec := do(http.MethodPut, "/api/v1/trips/0190f7a2-0000-7000-8000-000000000001/positions")
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+	assert.Equal(t, "GET, POST", rec.Header().Get("Allow"))
+	assert.Equal(t, "method_not_allowed", problem(t, rec).Code)
+}
+
 func TestTripIDMustBeCanonicalUUID(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -63,6 +75,8 @@ func TestTripIDMustBeCanonicalUUID(t *testing.T) {
 		{name: "not a uuid", method: http.MethodGet, path: "/api/v1/trips/abc"},
 		{name: "uuid without dashes", method: http.MethodGet, path: "/api/v1/trips/0190f7a2000070008000000000000001"},
 		{name: "finish with braces", method: http.MethodPost, path: "/api/v1/trips/%7B0190f7a2-0000-7000-8000-000000000001%7D/finish"},
+		{name: "add position without dashes", method: http.MethodPost, path: "/api/v1/trips/0190f7a2000070008000000000000001/positions"},
+		{name: "list positions not a uuid", method: http.MethodGet, path: "/api/v1/trips/abc/positions"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -14,9 +15,24 @@ const otlpProtocol = "http/protobuf"
 type Config struct {
 	HTTP            HTTP
 	DB              DB
+	Positions       Positions
+	Push            Push
 	LogLevel        slog.Level
 	ShutdownTimeout time.Duration
 	ServiceName     string
+}
+
+type Positions struct {
+	CheckInterval time.Duration
+	StaleAfter    time.Duration
+	Workers       int
+	QueueSize     int
+	ScanBatchSize int
+}
+
+type Push struct {
+	URL            string
+	RequestTimeout time.Duration
 }
 
 type HTTP struct {
@@ -53,6 +69,17 @@ func Load() (Config, error) {
 			MaxConnLifetime: p.duration("DATABASE_MAX_CONN_LIFETIME"),
 			ConnectTimeout:  p.duration("DATABASE_CONNECT_TIMEOUT"),
 			QueryTimeout:    p.duration("DATABASE_QUERY_TIMEOUT"),
+		},
+		Positions: Positions{
+			CheckInterval: p.duration("POSITION_CHECK_INTERVAL"),
+			StaleAfter:    p.duration("POSITION_STALE_AFTER"),
+			Workers:       int(p.intAtLeast("POSITION_WORKERS", 1)),
+			QueueSize:     int(p.intAtLeast("POSITION_QUEUE_SIZE", 1)),
+			ScanBatchSize: int(p.intAtLeast("POSITION_SCAN_BATCH_SIZE", 1)),
+		},
+		Push: Push{
+			URL:            p.httpURL("PUSH_HTTP_URL"),
+			RequestTimeout: p.duration("PUSH_REQUEST_TIMEOUT"),
 		},
 		LogLevel:        p.level("LOG_LEVEL"),
 		ShutdownTimeout: p.duration("SHUTDOWN_TIMEOUT"),
@@ -123,6 +150,19 @@ func (p *parser) intAtLeast(name string, minValue int32) int32 {
 		return 0
 	}
 	return int32(n)
+}
+
+func (p *parser) httpURL(name string) string {
+	raw := p.required(name)
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		p.fail(name, errors.New("must be an http or https URL with a host"))
+		return ""
+	}
+	return raw
 }
 
 func (p *parser) level(name string) slog.Level {

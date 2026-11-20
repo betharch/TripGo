@@ -20,10 +20,6 @@ func checkTripID(r *http.Request) error {
 }
 
 func toResponse(t model.Trip) api.Trip {
-	finishedAt := nullable.NewNullNullable[time.Time]()
-	if t.FinishedAt != nil {
-		finishedAt = nullable.NewNullableWithValue(t.FinishedAt.UTC())
-	}
 	return api.Trip{
 		Id:             t.ID,
 		UserId:         t.UserID,
@@ -33,7 +29,14 @@ func toResponse(t model.Trip) api.Trip {
 		Price:          t.Price,
 		Status:         api.TripStatus(t.Status),
 		StartedAt:      t.StartedAt.UTC(),
-		FinishedAt:     finishedAt,
-		LastPositionAt: nullable.NewNullNullable[time.Time](),
+		FinishedAt:     nullableTime(t.FinishedAt),
+		LastPositionAt: nullableTime(t.LastPositionAt),
 	}
+}
+
+func nullableTime(t *time.Time) nullable.Nullable[time.Time] {
+	if t == nil {
+		return nullable.NewNullNullable[time.Time]()
+	}
+	return nullable.NewNullableWithValue(t.UTC())
 }

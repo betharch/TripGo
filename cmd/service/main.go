@@ -34,6 +34,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	c.Start(ctx)
 
 	ln, err := net.Listen("tcp", cfg.HTTP.Addr)
 	if err != nil {

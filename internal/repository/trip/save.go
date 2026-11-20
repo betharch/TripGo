@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/betharch/TripGo/internal/domain/trip"
@@ -57,6 +59,47 @@ func (r *Repo) Complete(ctx context.Context, t model.Trip) error {
 	}
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("complete trip %s: %w", t.ID, trip.ErrTripNotFound)
+	}
+	return nil
+}
+
+func (r *Repo) SavePosition(ctx context.Context, p model.Position) (int64, error) {
+	query, args, err := psql.Insert("trip_positions").
+		Columns("trip_id", "latitude", "longitude", "recorded_at").
+		Values(p.TripID, p.Point.Latitude, p.Point.Longitude, p.RecordedAt).
+		Suffix("RETURNING id").
+		ToSql()
+	if err != nil {
+		return 0, fmt.Errorf("build insert position query: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	var id int64
+	if err := r.db(ctx).QueryRow(ctx, query, args...).Scan(&id); err != nil {
+		return 0, fmt.Errorf("insert position: %w", err)
+	}
+	return id, nil
+}
+
+func (r *Repo) AdvanceLastPosition(ctx context.Context, tripID uuid.UUID, recordedAt time.Time) error {
+	query, args, err := psql.Update("trips").
+		Set("last_position_at", sq.Expr("GREATEST(last_position_at, ?)", recordedAt)).
+		Set("updated_at", sq.Expr("now()")).
+		Where(sq.Eq{"id": tripID}).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("build advance last position query: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	tag, err := r.db(ctx).Exec(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("advance last position: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("advance last position of trip %s: %w", tripID, trip.ErrTripNotFound)
 	}
 	return nil
 }
