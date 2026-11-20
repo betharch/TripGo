@@ -9,16 +9,20 @@ import (
 	api "github.com/betharch/TripGo/internal/generated"
 	"github.com/betharch/TripGo/internal/http/domainerror"
 	"github.com/betharch/TripGo/internal/http/health"
+	addpositionhttp "github.com/betharch/TripGo/internal/http/trip/addposition"
 	createhttp "github.com/betharch/TripGo/internal/http/trip/create"
 	finishhttp "github.com/betharch/TripGo/internal/http/trip/finish"
 	gethttp "github.com/betharch/TripGo/internal/http/trip/get"
+	listpositionshttp "github.com/betharch/TripGo/internal/http/trip/listpositions"
 )
 
 type server struct {
-	create *createhttp.Handler
-	get    *gethttp.Handler
-	finish *finishhttp.Handler
-	health *health.Handler
+	create        *createhttp.Handler
+	get           *gethttp.Handler
+	finish        *finishhttp.Handler
+	addPosition   *addpositionhttp.Handler
+	listPositions *listpositionshttp.Handler
+	health        *health.Handler
 }
 
 var _ api.ServerInterface = server{}
@@ -33,6 +37,14 @@ func (s server) GetTrip(w http.ResponseWriter, r *http.Request, tripID api.TripI
 
 func (s server) FinishTrip(w http.ResponseWriter, r *http.Request, tripID api.TripId) {
 	s.finish.Handle(w, r, tripID)
+}
+
+func (s server) CreateTripPosition(w http.ResponseWriter, r *http.Request, tripID api.TripId) {
+	s.addPosition.Handle(w, r, tripID)
+}
+
+func (s server) ListTripPositions(w http.ResponseWriter, r *http.Request, tripID api.TripId) {
+	s.listPositions.Handle(w, r, tripID)
 }
 
 func (s server) Health(w http.ResponseWriter, r *http.Request) {

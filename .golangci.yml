@@ -67,6 +67,10 @@ linters:
               desc: домен не знает про инфраструктуру
             - pkg: github.com/betharch/TripGo/internal/http
               desc: домен не знает про транспорт
+            - pkg: github.com/betharch/TripGo/internal/worker
+              desc: домен не знает про фоновые компоненты
+            - pkg: github.com/betharch/TripGo/internal/gateway
+              desc: домен не знает про соседние сервисы
         model:
           files:
             - "**/internal/model/**"
@@ -103,6 +107,10 @@ linters:
               desc: usecase не знает про инфраструктуру
             - pkg: github.com/betharch/TripGo/internal/http
               desc: usecase не знает про транспорт
+            - pkg: github.com/betharch/TripGo/internal/worker
+              desc: usecase знает только свой интерфейс отмены, а не фоновый компонент
+            - pkg: github.com/betharch/TripGo/internal/gateway
+              desc: usecase не знает про реализацию похода в соседний сервис
         transport:
           files:
             - "**/internal/http/**"
@@ -111,6 +119,54 @@ linters:
               desc: транспорт ходит в бд только через usecase
             - pkg: github.com/betharch/TripGo/internal/infra
               desc: транспорт не знает про инфраструктуру
+            - pkg: github.com/betharch/TripGo/internal/worker
+              desc: транспорт не знает про фоновые компоненты
+            - pkg: github.com/betharch/TripGo/internal/gateway
+              desc: транспорт не ходит в соседние сервисы
+        worker:
+          files:
+            - "**/internal/worker/**"
+          deny:
+            - pkg: net/http
+              desc: воркер ходит в соседний сервис через свой интерфейс, а не через HTTP
+            - pkg: github.com/go-chi/chi
+              desc: воркер не знает про роутер
+            - pkg: github.com/jackc/pgx
+              desc: воркер работает через интерфейсы, а не через драйвер бд
+            - pkg: github.com/Masterminds/squirrel
+              desc: воркер не строит SQL
+            - pkg: github.com/betharch/TripGo/internal/generated
+              desc: воркер не знает про сгенерированный HTTP-контракт
+            - pkg: github.com/betharch/TripGo/internal/gateway
+              desc: воркер знает только свой интерфейс гейтвея, а не реализацию
+            - pkg: github.com/betharch/TripGo/internal/repository
+              desc: воркер знает только свой интерфейс хранилища, а не реализацию
+            - pkg: github.com/betharch/TripGo/internal/infra
+              desc: воркер не знает про инфраструктуру
+            - pkg: github.com/betharch/TripGo/internal/http
+              desc: воркер не знает про транспорт
+        gateway:
+          files:
+            - "**/internal/gateway/**"
+          deny:
+            - pkg: github.com/go-chi/chi
+              desc: гейтвей не знает про наш роутер
+            - pkg: github.com/jackc/pgx
+              desc: гейтвей не ходит в бд
+            - pkg: github.com/Masterminds/squirrel
+              desc: гейтвей не строит SQL
+            - pkg: github.com/betharch/TripGo/internal/generated
+              desc: гейтвей не знает про наш HTTP-контракт
+            - pkg: github.com/betharch/TripGo/internal/usecase
+              desc: гейтвей не знает про сценарии
+            - pkg: github.com/betharch/TripGo/internal/worker
+              desc: гейтвей не знает про своего потребителя
+            - pkg: github.com/betharch/TripGo/internal/repository
+              desc: гейтвей не знает про хранилище
+            - pkg: github.com/betharch/TripGo/internal/infra
+              desc: гейтвей не знает про инфраструктуру, HTTP-клиент он получает готовым
+            - pkg: github.com/betharch/TripGo/internal/http
+              desc: гейтвей не знает про входящий транспорт
 
     # Запрещает обращения через идентификатор с подчёркиванием, поэтому пакеты
     # называем без snake_case: internal/adapter/http, а не internal/adapter/http_server.

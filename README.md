@@ -8,6 +8,9 @@ HTTP-сервис лабораторных работ курса «Разраб�
 сервис ведёт себя так же, как после ЛР1. Задание со звёздочкой ЛР2 (мутационное тестирование) не
 сделано.
 
+В ЛР3 сервис принимает координаты поездки и отдаёт её маршрут. Поездки, от которых координат
+давно нет, он опрашивает через Push Service. Из заданий со звёздочкой сделана выборка батчами.
+
 ## Требования
 
 Go 1.26+, Docker, [`tripgoctl`](https://github.com/course-go-autumn-2026/course-infra), `make`, `curl`
@@ -50,6 +53,8 @@ curl -s -X POST localhost:8080/api/v1/trips/$TRIP_ID/finish | jq   # 409 trip_co
 | `POST` | `/api/v1/trips` | `201` и `Location`, `400`, `409 driver_busy`, `500` |
 | `GET` | `/api/v1/trips/{tripId}` | `200`, `400`, `404 trip_not_found`, `500` |
 | `POST` | `/api/v1/trips/{tripId}/finish` | `200`, `400`, `404 trip_not_found`, `409 trip_completed`, `500` |
+| `POST` | `/api/v1/trips/{tripId}/positions` | `201`, `400`, `404 trip_not_found`, `409 trip_completed`, `500` |
+| `GET` | `/api/v1/trips/{tripId}/positions` | `200`, `400`, `404 trip_not_found`, `500` |
 | `GET` | `/health` | `200`, в базу не ходит |
 | `GET` | `/ready` | `200` или `503`, если база недоступна |
 
@@ -90,6 +95,37 @@ usecase (`Create`). Поэтому интерфейсы узкие и легко
 Сверх дерева ТЗ добавлен только `http/health`: проб в дереве нет, а ручке нужен свой пакет. Путь
 `cmd/service` взят из ТЗ, хотя в `conventions.md` написано `cmd/trip-service`.
 
+## Опрос устаревших поездок
+
+![Устройство опроса устаревших поездок](https://raw.githubusercontent.com/course-go-autumn-2026/course/15cc21faa21af9bccbd40fd44ce6138098de08b9/homework/assets/lab3.png)
+
+Если активная поездка дольше `POSITION_STALE_AFTER` не присылает координаты, сервис просит их у
+водителя: шлёт в Push Service команду `REQUEST_POSITION`.
+
+Схема:
+
+1. Сканер раз в `POSITION_CHECK_INTERVAL` читает из базы устаревшие поездки порциями, начиная с
+   тех, что молчат дольше всех, и кладёт их в очередь.
+2. Очередь лежит в памяти, её размер ограничен. Одна поездка в ней дважды не стоит.
+3. Воркеры берут поездки из очереди. Если координата успела прийти, пока поездка ждала, воркер
+   её пропускает.
+4. Push Service получает от воркера команду `REQUEST_POSITION`. Воркер ждёт ответа до таймаута
+   и запрос не повторяет: поездку и так найдёт следующий обход.
+
+Параметры, в скобках значения из `.env.example`:
+
+- `POSITION_CHECK_INTERVAL` (`30s`): как часто сканер проверяет поездки;
+- `POSITION_STALE_AFTER` (`60s`): сколько поездка может молчать;
+- `POSITION_WORKERS` (`4`): число воркеров;
+- `POSITION_QUEUE_SIZE` (`100`): размер очереди;
+- `POSITION_SCAN_BATCH_SIZE` (`100`): сколько поездок сканер читает одним запросом;
+- `PUSH_HTTP_URL`: адрес Push Service;
+- `PUSH_REQUEST_TIMEOUT` (`1s`): таймаут запроса в Push Service.
+
+Если очередь заполнена, сканер не ждёт. Поездку, которой не хватило места, он считает в
+`tripgo.stale_checks{result="dropped"}`, пишет `Warn` в лог и заканчивает обход. Поездка не
+теряется: на следующем тике она снова попадёт в выборку.
+
 ## Наблюдаемость
 
 Логи идут в stdout в JSON, внутри запроса в них есть `trace_id` и `span_id`. Трейсы и метрики
@@ -114,6 +150,7 @@ tripgoctl, примеры значений лежат в [`.env.example`](.env.e
 | `DATABASE_CONNECT_TIMEOUT` | таймаут подключения |
 | `DATABASE_QUERY_TIMEOUT` | таймаут запроса к БД и проверки `/ready` |
 | `HTTP_READ_HEADER_TIMEOUT`, `HTTP_READ_TIMEOUT`, `HTTP_WRITE_TIMEOUT`, `HTTP_IDLE_TIMEOUT` | таймауты HTTP-сервера |
+| `POSITION_*`, `PUSH_HTTP_URL`, `PUSH_REQUEST_TIMEOUT` | опрос устаревших поездок, описаны в разделе выше |
 | `OTEL_SERVICE_NAME` | имя сервиса в телеметрии и поле `service` в логах |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | адрес коллектора |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | только `http/protobuf` |

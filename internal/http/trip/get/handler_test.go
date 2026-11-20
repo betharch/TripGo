@@ -37,9 +37,10 @@ func serve(uc *Mockusecase) *httptest.ResponseRecorder {
 func TestGetReturnsTrip(t *testing.T) {
 	uc := NewMockusecase(gomock.NewController(t))
 	finishedAt := time.Date(2026, 11, 6, 12, 25, 0, 0, time.UTC)
+	lastPositionAt := finishedAt.Add(-time.Minute)
 	uc.EXPECT().Get(gomock.Any(), id).Return(model.Trip{
 		ID: id, Status: trip.StatusCompleted, Price: 1450,
-		StartedAt: finishedAt.Add(-25 * time.Minute), FinishedAt: &finishedAt,
+		StartedAt: finishedAt.Add(-25 * time.Minute), FinishedAt: &finishedAt, LastPositionAt: &lastPositionAt,
 	}, nil)
 
 	rec := serve(uc)
@@ -52,6 +53,21 @@ func TestGetReturnsTrip(t *testing.T) {
 	gotFinished, err := got.FinishedAt.Get()
 	require.NoError(t, err)
 	assert.Equal(t, finishedAt, gotFinished)
+	gotLastPosition, err := got.LastPositionAt.Get()
+	require.NoError(t, err)
+	assert.Equal(t, lastPositionAt, gotLastPosition)
+}
+
+func TestGetReturnsNullLastPositionForTripWithoutPositions(t *testing.T) {
+	uc := NewMockusecase(gomock.NewController(t))
+	uc.EXPECT().Get(gomock.Any(), id).Return(model.Trip{ID: id, Status: trip.StatusActive}, nil)
+
+	rec := serve(uc)
+
+	var got map[string]any
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&got))
+	assert.Contains(t, got, "last_position_at")
+	assert.Nil(t, got["last_position_at"])
 }
 
 func TestGetMissingTripIs404(t *testing.T) {

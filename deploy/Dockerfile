@@ -3,9 +3,9 @@
 FROM golang:1.26-alpine AS build
 WORKDIR /src
 
-COPY go.mod go.sum ./
-COPY cmd ./cmd
-COPY internal ./internal
+COPY ["go.mod", "go.sum", "./"]
+COPY ["cmd", "./cmd"]
+COPY ["internal", "./internal"]
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \

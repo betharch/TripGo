@@ -28,6 +28,10 @@ func TestCollectionName(t *testing.T) {
 		{sql: "SELECT id, status FROM trips WHERE id = $1 FOR UPDATE", want: trips},
 		{sql: "UPDATE trips SET status = $1 WHERE id = $2", want: trips},
 		{sql: "insert into trip_status_history (trip_id) values ($1)", want: "trip_status_history"},
+		{sql: "INSERT INTO trip_positions (trip_id,latitude) VALUES ($1,$2) RETURNING id", want: "trip_positions"},
+		{sql: "SELECT id FROM trip_positions WHERE trip_id = $1 ORDER BY recorded_at, id", want: "trip_positions"},
+		{sql: "UPDATE trips SET last_position_at = GREATEST(last_position_at, $1), updated_at = now() WHERE id = $2", want: trips},
+		{sql: "SELECT id, driver_id FROM trips WHERE status = 'active' AND COALESCE(last_position_at, started_at) < now() - $1::interval ORDER BY COALESCE(last_position_at, started_at)", want: trips},
 		{sql: "begin isolation level read committed", want: ""},
 		{sql: "commit", want: ""},
 	}
